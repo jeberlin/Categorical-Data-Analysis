@@ -1,0 +1,949 @@
+---
+title: "Categorical Project"
+author: "Jenny Eberling"
+date: "11/13/2021"
+output: word_document
+---
+
+My first step was to convert number of cars from a numeric variable with levels 0,1,2,3,4 to a categorical variable with levels zero, one, two, three +
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(VGAM)
+library(MASS)
+library(lmtest)
+
+bike <- read.csv("C:/Users/eberl/OneDrive/Desktop/bike_buyers_clean.csv")
+bike$Cars <- as.factor(bike$Cars)
+summary(bike$Cars)
+# Make num cars categorical
+bike<-bike %>% mutate(Cars = recode(Cars, 
+  "0" = 0,                                   
+  "1" = 1,
+  "2" = 2,
+  "3" = 3,
+  "4" = 3))
+#summary(bike$Cars)
+
+bike$Children <- as.factor(bike$Children)
+bike$Gender<-as.factor(bike$Gender)
+bike$Marital.Status<-as.factor(bike$Marital.Status)
+bike$Education<-as.factor(bike$Education)
+bike$Occupation<-as.factor(bike$Occupation)
+bike$Home.Owner<-as.factor(bike$Home.Owner)
+bike$Commute.Distance<-as.factor(bike$Commute.Distance)
+bike$Region<-as.factor(bike$Region)
+bike$Purchased.Bike<-as.factor(bike$Purchased.Bike)
+
+
+#Put in a more reasonable order
+bike$Commute.Distance <- factor(bike$Commute.Distance, levels = c("0-1 Miles", "1-2 Miles", "2-5 Miles","5-10 Miles","10+ Miles"))
+
+bike$Education <- factor(bike$Education, levels = c("Partial High School", "High School", "Partial College","Bachelors","Graduate Degree"))
+```
+
+Data exploration
+
+```{r }
+cor(bike$Income,bike$Age) # Not super correlated
+plot(bike$Income, bike$Age)
+
+# Income by categorical variables
+plot(bike$Income ~ bike$Gender, xlab="Gender",ylab="Income") # Suspiciously equal
+plot(bike$Income ~ bike$Marital.Status) # Pretty even
+plot(bike$Income ~ bike$Education, xlab="Education", ylab="Income") #positive trend
+plot(bike$Income ~ bike$Home.Owner)
+plot(bike$Income ~ bike$Commute.Distance, xlab="Distance",ylab="Income") #positive trend
+plot(bike$Income ~ bike$Region, xlab="Region",ylab="Income")
+plot(bike$Income ~ bike$Purchased.Bike)
+plot(bike$Income ~ bike$Children, xlab="Children",ylab="Income", main="Income vs Children")
+plot(bike$Income ~ bike$Occupation, xlab="Occupation", ylab="Income")
+aggregate(bike$Income, list(bike$Region), FUN=mean)
+aggregate(bike$Income, list(bike$Occupation), FUN=mean)
+
+
+# Age by categorical variabels
+plot(bike$Age ~ bike$Gender)  
+plot(bike$Age ~ bike$Marital.Status)  
+plot(bike$Age ~ bike$Education)
+plot(bike$Age ~ bike$Home.Owner)
+plot(bike$Age ~ bike$Commute.Distance, xlab="Distance",ylab="Age") #Bit of a trend, younger people living closer
+plot(bike$Age ~ bike$Children)
+plot(bike$Age ~ bike$Region)
+plot(bike$Age ~ bike$Purchased.Bike) #Typically younger people are buying bikes
+
+# Contingency tables of categorical variables
+table(bike$Purchased.Bike, bike$Gender)
+table(bike$Purchased.Bike, bike$Education)
+table(bike$Gender, bike$Education)
+table(bike$Purchased.Bike, bike$Commute.Distance)
+table(bike$Gender, bike$Commute.Distance)
+table(bike$Region, bike$Commute.Distance)
+table(bike$Home.Owner, bike$Commute.Distance)
+table(bike$Home.Owner, bike$Gender)
+table(bike$Purchased.Bike, bike$Marital.Status)
+table(bike$Home.Owner, bike$Region)
+table(bike$Region, bike$Education)
+table(bike$Education, bike$Occupation)
+table(bike$Education, bike$Commute.Distance)
+table(bike$Children, bike$Region)
+
+# Look at Cars breakdown
+table(bike$Cars, bike$Education)
+table(bike$Cars, bike$Commute.Distance)
+table(bike$Cars, bike$Occupation)
+table(bike$Cars, bike$Region)
+
+#For presentation
+plot(bike$Income ~ bike$Region, xlab="Region",ylab="Income",col=c("darkolivegreen1", "darkolivegreen3","darkolivegreen4"))
+plot(bike$Income ~ bike$Commute.Distance, xlab="Commute Distance",ylab="Income",col=c("darkolivegreen1", "darkolivegreen2","darkolivegreen3","darkolivegreen4","darkolivegreen"))
+plot(bike$Income ~ bike$Gender, xlab="Gender",ylab="Income",col=c("darkolivegreen1", "darkolivegreen3"))
+
+#For paper
+levels(bike$Education)
+label=c('Partial HS', 'HS','Partial College','Bachelors','Graduate')
+plot(bike$Income ~ bike$Education, xlab="Education", ylab="Income", names=label, main='Income by Education Level')
+plot(bike$Income ~ bike$Gender, xlab="Gender",ylab="Income", main="Income by Gender")
+```
+cumulative logit model with proportional odds 
+
+Forward selection manually
+
+```{r selection}
+#Step 1 - variables individually 
+
+#Forward Selection
+
+#Marital Status - 2694.7
+fit1 <- vglm(bike$Cars ~ bike$Marital.Status, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Gender - 2690.103
+fit1 <- vglm(bike$Cars ~ bike$Gender, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Income - 2514.081, p-value = <2e-16 ***
+fit1 <- vglm(bike$Cars ~ bike$Income, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Children - 2550.5
+fit1 <- vglm(bike$Cars ~ bike$Children, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Education - 2531.964
+fit1 <- vglm(bike$Cars ~ bike$Education, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Occupation - 2545.247
+fit1 <- vglm(bike$Cars ~ bike$Occupation, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Home.Owner - 2688.315, p-value = 0.0113 *
+fit1 <- vglm(bike$Cars ~ bike$Home.Owner, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Commute Distance - 2480.624
+fit1 <- vglm(bike$Cars ~ bike$Commute.Distance, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Region - 2622.393
+fit1 <- vglm(bike$Cars ~ bike$Region, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Age - 2650.816, p-value = 1.91e-10 ***
+fit1 <- vglm(bike$Cars ~ bike$Age, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Purchased.Bike - 2648.411, p-value = 1.24e-11 ***
+fit1 <- vglm(bike$Cars ~ bike$Purchased.Bike, family=cumulative(parallel=T))
+AIC(fit1)
+
+```
+Add commute.distance and go to step 2
+Starting with AIC = 2480.624
+
+```{r }
+#Marital.Status - 2481.954
+fit2 <- vglm(Cars ~ Commute.Distance + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Gender
+fit2 <- vglm(Cars ~ Commute.Distance + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Income
+fit2 <- vglm(Cars ~ Commute.Distance + Income, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Children
+fit2 <- vglm(Cars ~ Commute.Distance + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Education
+fit2 <- vglm(Cars ~ Commute.Distance + Education, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Occupation
+fit2 <- vglm(Cars ~ Commute.Distance + Occupation, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Home.Owner
+fit2 <- vglm(Cars ~ Commute.Distance + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Region
+fit2 <- vglm(Cars ~ Commute.Distance + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Age
+fit2 <- vglm(Cars ~ Commute.Distance + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Purchased.Bike
+fit2 <- vglm(Cars ~ Commute.Distance + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+
+```
+
+Add Education
+Current AIC = 2348.766
+
+```{r }
+#Marital.Status
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Gender
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Income
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Income, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Children
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Occupation - AIC = 2036.45
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Occupation, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Home.Owner
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Region
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Age
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+
+#Purchased.Bike
+fit3 <- vglm(Cars ~ Commute.Distance + Education + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit3)
+```
+
+Add Occupation 
+Current AIC = 2036.45
+
+```{r }
+#Marital.Status
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+#Gender
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+#Income
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+#Children
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+#Home.Owner
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+#Region
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+#Age
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+#Purchased.Bike
+fit4 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit4)
+
+```
+Add Income
+Current AIC = 1960.879
+
+```{r }
+#Marital.Status
+fit5 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit5)
+
+#Gender
+fit5 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit5)
+
+#Children
+fit5 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit5)
+
+#Home.Owner
+fit5 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit5)
+
+#Region
+fit5 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit5)
+
+#Age 
+fit5 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit5)
+
+#Purchased.Bike
+fit5 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit5)
+
+```
+
+Add Children
+Current AIC = 1901.528
+
+```{r }
+#Marital.Status
+fit6 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit6)
+
+#Gender
+fit6 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit6)
+
+#Home.Owner
+fit6 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit6)
+
+#Region
+fit6 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit6)
+
+#Age
+fit6 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit6)
+
+#Purchased.Bike
+fit6 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit6)
+
+```
+Add Region
+Current AIC = 1886.925
+```{r }
+#Marital.Status
+fit7 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit7)
+
+#Gender
+fit7 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit7)
+
+#Home.Owner
+fit7 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit7)
+
+#Age
+fit7 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit7)
+
+#Purchased.Bike
+fit7 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit7)
+
+```
+Add Purchased.Bike - JUST BARELY helps
+Current AIC = 1875.33
+```{r }
+#Marital.Status
+fit8 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit8)
+
+#Gender
+fit8 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit8)
+
+#Home.Owner
+fit8 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit8)
+
+#Age
+fit8 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit8)
+
+```
+Add Home.Owner
+Current AIC = 1870.065
+
+```{r }
+#Marital.Status
+fit9 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Marital.Status, data=bike, family=cumulative(parallel=T))
+AIC(fit9)
+
+#Gender
+fit9 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Gender, data=bike, family=cumulative(parallel=T))
+AIC(fit9)
+
+#Age
+fit9 <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Age, data=bike, family=cumulative(parallel=T))
+AIC(fit9)
+
+```
+Finally, none of those are lower, so we've reached out final model. It contains:
+Commute.Distance, Education, Occupation, Income, Children, Region, Purchased.Bike, and Home.Owner
+
+```{r}
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+summary(fit)
+AIC(fit)
+```
+
+
+
+
+
+
+
+
+############################################################################################
+
+
+
+
+
+
+I'm going to take a look at how checking to remove variables after each addition changes things.
+
+Forward selection with removal
+
+After adding commute.distance, we added education
+Having both still has a lower AIC than either on its own. 
+
+```{r }
+
+#Marital Status
+fit1 <- vglm(Cars ~ Commute.Distance, data=bike, family=cumulative(parallel=T))
+AIC(fit1)
+
+#Add education
+fit2 <- vglm(Cars ~ Commute.Distance + Education, data=bike, family=cumulative(parallel=T))
+AIC(fit2)
+
+#Marital Status
+fit1 <- vglm(Cars ~ Education, data=bike, family=cumulative(parallel=T))
+AIC(fit1)
+
+
+```
+Then we added occupation 
+Neither of removed models have a lower AIC, so we keep them all in
+
+```{r }
+#All three, AIC = 2036.45
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Remove Commute.Distance
+fit2 <- vglm(Cars ~ Education + Occupation, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Remove Education
+fit <- vglm(Cars ~ Commute.Distance + Occupation, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+```
+Then we added Income
+All four has the lowest AIC so no removal
+
+```{r }
+#All four
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Without Commute.Distance
+fit <- vglm(Cars ~ Education + Occupation + Income, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Without Education
+fit <- vglm(Cars ~ Commute.Distance + Occupation + Income, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Without Occupation
+fit <- vglm(Cars ~ Commute.Distance + Education + Income, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+```
+
+Then we added Children
+All five is the lowest AIC so keep them all in
+
+```{r }
+#All five
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Without Income
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation  + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Without Occupation
+fit <- vglm(Cars ~ Commute.Distance + Education + Income + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Without Education
+fit <- vglm(Cars ~ Commute.Distance + Occupation + Income + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Without Commute.Distance
+fit <- vglm(Cars ~ Education + Occupation + Income + Children, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+```
+Next we add Region
+All six is still the lowest, keep all variables
+
+```{r }
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Remove Children
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Income
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Children + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Occupation
+fit <- vglm(Cars ~ Commute.Distance + Education + Income + Children + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Education
+fit <- vglm(Cars ~ Commute.Distance + Occupation + Income + Children + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Commute.Distance
+fit <- vglm(Cars ~ Education + Occupation + Income + Children + Region, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+```
+Then we add Purchased.Bike
+All seven has the lowest AIC, so don't drop any variables
+```{r }
+#All seven
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Remove Region
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Children
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Region + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Income
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Children + Region + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Occupation
+fit <- vglm(Cars ~ Commute.Distance + Education + Income + Children + Region + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Education
+fit <- vglm(Cars ~ Commute.Distance + Occupation + Income + Children + Region + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Commute.Distance
+fit <- vglm(Cars ~ Education + Occupation + Income + Children + Region + Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+```
+The last variable added was Home.Owner
+All eight has the lowest AIC, so no need to remove any. Our final model is the same. 
+
+```{r }
+#All eight
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+#Remove Purchased.Bike
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Region
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Children
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Income
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Occupation
+fit <- vglm(Cars ~ Commute.Distance + Education + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Education
+fit <- vglm(Cars ~ Commute.Distance + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+#Remove Commute.Distance
+fit <- vglm(Cars ~ Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fit)
+
+```
+
+
+
+####################################################################################################
+
+
+Check for interaction
+Current low AIC: 1870.065
+
+First, let's look at interactions I think are most plausible. 
+
+```{r }
+
+#CD:R - AIC = 1802.951
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Region, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+#Income:HO
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Income:Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+#Education:Income
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Education:Income, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+#Commute.Distance:Purchased.Bike
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+#Occupation:Salary
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Occupation:Income, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+
+
+
+#This don't run for some reason
+#Occupation:Education
+#fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Occupation:Education, data=bike, family=cumulative(parallel=T))
+#AIC(fiti)
+
+
+
+```
+
+
+```{r }
+########## Commute.Distance Interaction #############
+#smallest: 1802.059
+
+#CD:E
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Education, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+#CD:I
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Income, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+#CD:R
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Region, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+#CD:PB
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Purchased.Bike, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+#CD:HO
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Home.Owner, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+
+
+#Doesn't run for some reason? Maybe not enough observations
+#CD:Child
+#fitin <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Children, data=bike, family=cumulative(parallel=T))
+#AIC(fitin)
+
+#CD:Oc
+#fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Occupation, data=bike, family=cumulative(parallel=T))
+#AIC(fiti)
+
+```
+
+I have two interactions tied, I will try to add them together in a model
+
+```{r }
+#CD:E
+fiti <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner + Commute.Distance:Education + Commute.Distance:Region, data=bike, family=cumulative(parallel=T))
+AIC(fiti)
+
+```
+
+
+But we'll still stick with original final model
+```{r }
+fit <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+
+AIC(fit)
+```
+
+
+
+
+
+What if commute distance was ordinal?
+
+H0: It’s okay to treat commute distance as quantitative with scores 0,1,2,5,10
+Ha: we need to treat commute distance as categorical
+
+p= 0.5993 so FTR H0. Not sig evidence we need to treat income as categorical.
+
+When scores are 0,1,2,3,4 , p = 0.02488 so reject H0. There is statistically sig evidence we need to treat c.d. as categorical.
+
+```{r }
+
+bike<-bike %>% mutate(Distance.Ordinal = recode(Commute.Distance, 
+  "0-1 Miles" = 0,                                   
+  "1-2 Miles" = 1,
+  "2-5 Miles" = 2,
+  "5-10 Miles" = 5,
+  "10+ Miles" = 10))
+
+
+fitord <- vglm(Cars ~ Distance.Ordinal + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+
+VGAM::lrtest(fit,fitord)
+
+AIC(fit)
+AIC(fitord) # It does decrease by 5
+
+
+# With different weights
+#### now with different weights
+bike<-bike %>% mutate(Distance.Ordinal2 = recode(Commute.Distance, 
+  "0-1 Miles" = 0,                                   
+  "1-2 Miles" = 1,
+  "2-5 Miles" = 2,
+  "5-10 Miles" = 3,
+  "10+ Miles" = 4))
+
+fitord2 <- vglm(Cars ~ Distance.Ordinal2 + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+
+AIC(fit)
+AIC(fitord2) # It actually increases
+VGAM::lrtest(fit,fitord2)
+
+```
+
+What if education was nominal?
+
+H0: It’s okay to treat education as quantitative with scores 0,1,2,3,4
+Ha: we need to treat education as categorical
+
+p = 0.001088 so reject H0. There is significant evidence that we need to treat income as categorical.
+
+```{r }
+bike<-bike %>% mutate(Education.Ordinal = recode(Education, 
+  "Partial High School" = 0,                                   
+  "High School" = 1,
+  "Partial College" = 2,
+  "Bachelors" = 3,
+  "Graduate Degree" = 4))
+
+
+fitedord <- vglm(Cars ~ Commute.Distance + Education.Ordinal + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T)) #with distance.ordinal, decreases by 5 like it did  before
+
+AIC(fit)
+AIC(fitedord) # Increases by 10
+VGAM::lrtest(fit,fitedord)
+```
+
+What if Children was nominal?
+
+H0: It’s okay to treat children as quantitative with scores 0,1,2,3,4,5
+Ha: we need to treat children as categorical
+
+p = 6.318e-07 so reject H0. There is statistically significant evidence that we need to treat children as categorical.
+
+```{r }
+bike2<-bike
+bike2$ch <- bike2$Children
+bike2$cho <- (as.numeric(bike2$ch) - 1)
+bike<-bike %>% mutate(Children.Ordinal = as.numeric(Children)-1)
+
+
+fitchord <- vglm(Cars ~ Commute.Distance + Education + Occupation + Income + Children.Ordinal + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T)) #with distance.ordinal, decreases by 5 like it did  before
+
+AIC(fit)
+AIC(fitchord) # Increases by 26
+VGAM::lrtest(fit,fitchord)
+```
+
+
+################################################################
+Now we have our model. Lets look at it.
+################################################################
+
+
+Check proportional odds assumption - model might be overfitted/too complex
+
+```{r }
+fit_ods <- vglm(Cars ~ Distance.Ordinal + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=T))
+summary(fit_ods)
+
+
+fit_no <- vglm(Cars ~ Distance.Ordinal + Education + Occupation + Income + Children + Region + Purchased.Bike + Home.Owner, data=bike, family=cumulative(parallel=F))
+summary(fit_no)
+```
+Look at standardized residuals
+Who are the massive outliers? Man who commutes a long distance and has 3 kids but 0 Cars
+Manager with 0 cars
+All have either 0 or 1 cars, but huge outliers have 0 
+
+```{r }
+bike$Residual <- resid(fitord)/sqrt(1-hatvalues(fitord))
+
+outliers <- bike %>%
+  filter(Residual > 3 | Residual < -3)
+
+
+```
+
+
+
+Predict for myself
+
+```{r }
+-2.337+3.750-.254-.00003471*20000-.3527
+-.1016+3.750-.254-.00003471*20000-.3527
+2.865+3.750-.254-.00003471*20000-.3527
+
+exp( 0.1121)/(1+exp( 0.1121))
+exp(2.3475)/(1+exp(2.3475))
+exp(5.3141)/(1+exp(5.3141))
+
+0.9127353-0.5279957
+0.9951024-0.9127353
+1-0.9951024
+```
+
+
+
+Predict for myself in many years
+
+
+```{r }
+-2.337-.1294*2+5.967-2.330-.00003471*120000-1.004+.4261
+-.1016-.1294*2+5.967-2.330-.00003471*120000-1.004+.4261
+2.865-.1294*2+5.967-2.330-.00003471*120000-1.004+.4261
+
+exp(-3.7019)/(1+exp(-3.7019))
+exp(-1.4665)/(1+exp(-1.4665))
+exp(1.5001)/(1+exp(1.5001))
+
+0.1874752-0.02408233
+0.8175894-0.1874752
+1-0.8175894
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#################################################################################
+Secondary Modeling
+#################################################################################
+
+Now we're going to build a model predicting if someone owns any car vs no car and see how it compares
+
+```{r }
+bike<-bike %>% mutate(Own.Car = recode(Cars, 
+  "0" = 0,                                   
+  "1" = 1,
+  "2" = 1,
+  "3" = 1,
+  "4" = 1))
+bike$Own.Car <- as.factor(bike$Own.Car)
+summary(bike$Own.Car)
+
+
+bike<-bike %>% mutate(Distance.Ordinal = recode(Commute.Distance, 
+  "0-1 Miles" = 0,                                   
+  "1-2 Miles" = 1,
+  "2-5 Miles" = 2,
+  "5-10 Miles" = 5,
+  "10+ Miles" = 10))
+
+
+
+
+
+
+fullmodel <- glm(Own.Car ~ Marital.Status + Gender + Income + Children + Education + Occupation + Home.Owner + Commute.Distance + Region + Age + Purchased.Bike, data=bike, family=binomial)
+
+
+stepAIC(fullmodel, direction="forward")
+
+stepAIC(fullmodel, direction="backward") # 550.5
+```
+
+Now with Commute.Distance as ordinal
+
+```{r }
+
+fullmodel2 <- glm(Own.Car ~ Marital.Status + Gender + Income + Children + Education + Occupation + Home.Owner + Distance.Ordinal + Region + Age + Purchased.Bike, data=bike, family=binomial)
+
+stepAIC(fullmodel2, direction="forward") # AIC = 559.1
+stepAIC(fullmodel2, direction="backward") # AIC = 551.8
+
+
+
+#### now with different weights
+bike<-bike %>% mutate(Distance.Ordinal2 = recode(Commute.Distance, 
+  "0-1 Miles" = 0,                                   
+  "1-2 Miles" = 1,
+  "2-5 Miles" = 2,
+  "5-10 Miles" = 3,
+  "10+ Miles" = 4))
+
+fullmodel3 <- glm(Own.Car ~ Marital.Status + Gender + Income + Children + Education + Occupation + Home.Owner + Distance.Ordinal2 + Region + Age + Purchased.Bike, data=bike, family=binomial)
+
+stepAIC(fullmodel3, direction="backward") # AIC = 545.8
+
+```
+
+
+
+
+
+
+
+
+
+
+Best subset strategy based on AIC
+library(bestglm)
+VARS <- cbind(#vars here)
+bestglm(VARS, IC="AIC", family=binomial)
+
+
+
+
+
+
